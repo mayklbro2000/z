@@ -7,8 +7,17 @@ const saveDesignBtn = document.getElementById('saveDesign');
 const statusDiv = document.getElementById('status');
 const contextMenu = document.getElementById('contextMenu');
 
-let rooms = [{ id: generateId(), name: 'Комната 1', width: 800, height: 600, blocks: [], door: null }];
-let currentRoomId = rooms[0].id;
+// Загрузка сохранённых данных или создание новой комнаты
+const savedDesigns = localStorage.getItem('roomDesigns');
+let rooms = savedDesigns ? JSON.parse(savedDesigns) : [{
+    id: generateId(),
+    name: 'Комната 1',
+    width: 800,
+    height: 600,
+    blocks: [],
+    door: null
+}];
+let currentRoomId = rooms[0]?.id || null;
 let draggedBlock = null;
 let draggedDoor = null;
 let offsetX, offsetY;
@@ -100,9 +109,9 @@ function updateCanvasSize() {
 }
 
 function drawRoom() {
-    if (!getCurrentRoom()) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     const room = getCurrentRoom();
+    if (!room) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     room.blocks.forEach(block => block.draw());
     if (room.door) room.door.draw();
 }
@@ -119,12 +128,10 @@ function renderTabs() {
         const tab = document.createElement('div');
         tab.className = `px-4 py-2 rounded-t ${room.id === currentRoomId ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-700'} cursor-pointer`;
         tab.textContent = room.name;
-        tab.addEventListener('click', (e) => {
-            if (e.button === 0) {
-                currentRoomId = room.id;
-                renderTabs();
-                updateCanvasSize();
-            }
+        tab.addEventListener('click', () => {
+            currentRoomId = room.id;
+            renderTabs();
+            updateCanvasSize();
         });
         tab.addEventListener('contextmenu', (e) => {
             e.preventDefault();
@@ -341,18 +348,16 @@ window.duplicateRoom = (id) => {
 
 window.deleteRoom = (id) => {
     rooms = rooms.filter(room => room.id !== id);
-    if (rooms.length > 0) {
-        currentRoomId = rooms[0].id;
-    } else {
-        currentRoomId = null;
-    }
+    currentRoomId = rooms[0]?.id || null;
     renderTabs();
     updateCanvasSize();
     contextMenu.classList.add('hidden');
     statusDiv.textContent = rooms.length > 0 ? 'Комната удалена' : 'Все комнаты удалены';
 };
 
-// Инициализация
-getCurrentRoom().door = new Door(0, 300, 'left');
+// Инициализация двери, если отсутствует
+if (getCurrentRoom() && !getCurrentRoom().door) {
+    getCurrentRoom().door = new Door(0, 300, 'left');
+}
 renderTabs();
 updateCanvasSize();
