@@ -1,21 +1,21 @@
-// Массив для хранения блоков (твой прогресс)
+// Массив для хранения блоков
 let blocks = [];
 
-// Функция для добавления блока (пример)
+// Функция для добавления блока
 function addBlock() {
     const block = {
-        id: Date.now(), // Уникальный ID
-        x: Math.random() * 400, // Случайная позиция X (замени на свои данные)
-        y: Math.random() * 400, // Случайная позиция Y
-        width: 50, // Ширина блока
-        height: 50, // Высота блока
-        color: 'blue' // Цвет блока
+        id: Date.now(),
+        x: Math.random() * 550, // Случайная позиция внутри канваса
+        y: Math.random() * 350,
+        width: 50,
+        height: 50,
+        color: 'blue'
     };
     blocks.push(block);
-    renderCanvas(); // Обновляем канвас
+    renderCanvas();
 }
 
-// Функция для отрисовки блоков на канвасе
+// Функция для отрисовки блоков
 function renderCanvas() {
     const canvasDiv = document.getElementById('canvas');
     canvasDiv.innerHTML = ''; // Очищаем канвас
@@ -33,17 +33,16 @@ function renderCanvas() {
 
 // Обработчик для кнопки "Сохранить"
 document.getElementById('save').addEventListener('click', () => {
-    // Сохраняем массив blocks в localStorage
     localStorage.setItem('roomDesign', JSON.stringify(blocks));
-    alert('Прогресс сохранен!'); // Показываем, что сохранение прошло
+    alert('Прогресс сохранен!');
 });
 
-// Обработчик для загрузки сохраненного прогресса при открытии страницы
+// Обработчик для загрузки сохраненного прогресса
 window.addEventListener('load', () => {
     const savedData = localStorage.getItem('roomDesign');
     if (savedData) {
         blocks = JSON.parse(savedData);
-        renderCanvas(); // Отрисовываем загруженные блоки
+        renderCanvas();
     }
 });
 
@@ -52,8 +51,8 @@ document.getElementById('add').addEventListener('click', addBlock);
 
 // Обработчик для кнопки "Создать комнату"
 document.getElementById('create').addEventListener('click', () => {
-    blocks = []; // Очищаем текущие блоки
-    localStorage.removeItem('roomDesign'); // Удаляем старое сохранение
-    renderCanvas(); // Очищаем канвас
+    blocks = [];
+    localStorage.removeItem('roomDesign');
+    renderCanvas();
     alert('Новая комната создана!');
 });
