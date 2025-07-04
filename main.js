@@ -7,21 +7,6 @@ const saveDesignBtn = document.getElementById('saveDesign');
 const statusDiv = document.getElementById('status');
 const contextMenu = document.getElementById('contextMenu');
 
-// Загрузка сохранённых данных или создание новой комнаты
-const savedDesigns = localStorage.getItem('roomDesigns');
-let rooms = savedDesigns ? JSON.parse(savedDesigns) : [{
-    id: generateId(),
-    name: 'Комната 1',
-    width: 800,
-    height: 600,
-    blocks: [],
-    door: null
-}];
-let currentRoomId = rooms[0]?.id || null;
-let draggedBlock = null;
-let draggedDoor = null;
-let offsetX, offsetY;
-
 class Block {
     constructor(id, x, y, width, height, isOn = false, isEmpty = false) {
         this.id = id;
@@ -91,6 +76,12 @@ function generateId() {
     return Math.random().toString(36).substr(2, 9);
 }
 
+let rooms = [];
+let currentRoomId = null;
+let draggedBlock = null;
+let draggedDoor = null;
+let offsetX, offsetY;
+
 function getCurrentRoom() {
     return rooms.find(room => room.id === currentRoomId) || null;
 }
@@ -109,9 +100,9 @@ function updateCanvasSize() {
 }
 
 function drawRoom() {
-    const room = getCurrentRoom();
-    if (!room) return;
+    if (!getCurrentRoom()) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const room = getCurrentRoom();
     room.blocks.forEach(block => block.draw());
     if (room.door) room.door.draw();
 }
@@ -128,10 +119,12 @@ function renderTabs() {
         const tab = document.createElement('div');
         tab.className = `px-4 py-2 rounded-t ${room.id === currentRoomId ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-700'} cursor-pointer`;
         tab.textContent = room.name;
-        tab.addEventListener('click', () => {
-            currentRoomId = room.id;
-            renderTabs();
-            updateCanvasSize();
+        tab.addEventListener('click', (e) => {
+            if (e.button === 0) {
+                currentRoomId = room.id;
+                renderTabs();
+                updateCanvasSize();
+            }
         });
         tab.addEventListener('contextmenu', (e) => {
             e.preventDefault();
@@ -335,7 +328,7 @@ window.duplicateRoom = (id) => {
         name: `${currentRoom.name} (копия)`,
         width: currentRoom.width,
         height: currentRoom.height,
-        blocks: currentRoom.blocks.map(block => new Block(block.id, block.x, block.y, block.width, block.height, block.isOn, block.isEmpty)),
+        blocks: currentRoom.blocks.map(block => new Block(generateId(), block.x, block.y, block.width, block.height, block.isOn, block.isEmpty)),
         door: currentRoom.door ? new Door(currentRoom.door.x, currentRoom.door.y, currentRoom.door.edge) : null
     };
     rooms.push(newRoom);
@@ -348,16 +341,41 @@ window.duplicateRoom = (id) => {
 
 window.deleteRoom = (id) => {
     rooms = rooms.filter(room => room.id !== id);
-    currentRoomId = rooms[0]?.id || null;
+    if (rooms.length > 0) {
+        currentRoomId = rooms[0].id;
+    } else {
+        currentRoomId = null;
+    }
     renderTabs();
     updateCanvasSize();
     contextMenu.classList.add('hidden');
     statusDiv.textContent = rooms.length > 0 ? 'Комната удалена' : 'Все комнаты удалены';
 };
 
-// Инициализация двери, если отсутствует
-if (getCurrentRoom() && !getCurrentRoom().door) {
-    getCurrentRoom().door = new Door(0, 300, 'left');
+// Загрузка из localStorage при старте
+const savedDesigns = localStorage.getItem('roomDesigns');
+if (savedDesigns) {
+    const parsedRooms = JSON.parse(savedDesigns);
+    rooms = parsedRooms.map(room => {
+        const blocks = room.blocks.map(b => new Block(b.id, b.x, b.y, b.width, b.height, b.isOn, b.isEmpty));
+        const door = room.door ? new Door(room.door.x, room.door.y, room.door.edge) : null;
+        return { ...room, blocks, door };
+    });
+    currentRoomId = rooms[0]?.id || null;
+    statusDiv.textContent = 'Загружен сохранённый проект';
+} else {
+    // Создаем первую комнату, если нет сохранений
+    const initialRoom = {
+        id: generateId(),
+        name: 'Комната 1',
+        width: 800,
+        height: 600,
+        blocks: [],
+        door: new Door(0, 300, 'left')
+    };
+    rooms.push(initialRoom);
+    currentRoomId = initialRoom.id;
 }
+
 renderTabs();
 updateCanvasSize();
