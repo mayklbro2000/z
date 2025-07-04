@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Чертёж комнаты с ПК</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f0f0f0;
+      padding: 20px;
+    }
+    #controls {
+      margin-bottom: 20px;
+    }
+    #tabs {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    .tab {
+      padding: 6px 12px;
+      background: #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+    .tab.active {
+      background: #888;
+      color: white;
+    }
+    .context-menu {
+      position: absolute;
+      background-color: white;
+      border: 1px solid #aaa;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+    .context-menu-item {
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    .context-menu-item:hover {
+      background-color: #eee;
+    }
+    #rooms .room {
+      display: none;
+    }
+    #rooms .room.active {
+      display: block;
+    }
+    .room {
+      position: relative;
+      width: 600px;
+      height: 400px;
+      resize: both;
+      overflow: hidden;
+      background-color: white;
+      border: 2px solid #333;
+    }
+    .pc {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      background-color: #007bff;
+      border-radius: 4px;
+      cursor: move;
+      transition: background-color 0.2s;
+    }
+    .pc.selected {
+      background-color: #28a745;
+    }
+    .door {
+      position: absolute;
+      background-color: #555;
+      cursor: move;
+      width: 10px;
+      height: 60px;
+      transform-origin: top left;
+    }
+    .guideline {
+      position: absolute;
+      width: 1px;
+      background-color: rgba(0,0,0,0.3);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <button onclick="addRoom()">Добавить комнату</button>
+    <button onclick="saveLayout()">Сохранить</button>
+    <button onclick="loadLayout()">Загрузить</button>
+  </div>
+  <div id="tabs"></div>
+  <div id="rooms"></div>
+  <div id="contextMenu" class="context-menu" style="display:none"></div>
+
+  <script>
+    let roomCount = 0;
+    let locked = false;
+
+    function setActiveRoom(index) {
+      document.querySelectorAll('.room').forEach((r, i) => {
+        r.classList.toggle('active', i === index);
+      });
+      document.querySelectorAll('.tab').forEach((t, i) => {
+        t.classList.toggle('active', i === index);
+      });
+    }
+
+    function createContextMenu(tab, event) {
+      const menu = document.getElementById('contextMenu');
+      menu.innerHTML = '';
+      menu.style.left = `${event.pageX}px`;
+      menu.style.top = `${event.pageY}px`;
+      menu.style.display = 'block';
+
+      const rename = document.createElement('div');
+      rename.textContent = 'Переименовать';
+      rename.className = 'context-menu-item';
+      rename.onclick = () => {
+        const newName = prompt('Введите новое имя комнаты:', tab.textContent);
+        if (newName) tab.textContent = newName;
+        menu.style.display = 'none';
+      };
+
+      const duplicate = document.createElement('div');
+      duplicate.textContent = 'Дублировать';
+      duplicate.className = 'context-menu-item';
+      duplicate.onclick = () => {
+        const index = [...document.querySelectorAll('.tab')].indexOf(tab);
+        const room = document.querySelectorAll('.room')[index];
+        const clone = room.cloneNode(true);
+        clone.classList.remove('active');
+        clone.querySelectorAll('.pc').forEach(pc => makePCDraggable(pc));
+        document.getElementById('rooms').appendChild(clone);
+
+        const newTab = tab.cloneNode(true);
+        newTab.textContent += ' (копия)';
+        newTab.addEventListener('click', () => {
+          setActiveRoom([...document.querySelectorAll('.tab')].indexOf(newTab));
+        });
+        newTab.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          createContextMenu(newTab, e);
+        });
+        document.getElementById('tabs').appendChild(newTab);
+        menu.style.display = 'none';
+        setActiveRoom(document.querySelectorAll('.tab').length - 1);
+      };
+
+      const lockToggle = document.createElement('div');
+      lockToggle.textContent = locked ? 'Разблокировать добавление' : 'Закрепить комнату';
+      lockToggle.className = 'context-menu-item';
+      lockToggle.onclick = () => {
+        locked = !locked;
+        menu.style.display = 'none';
+      };
+
+      const remove = document.createElement('div');
+      remove.textContent = 'Удалить';
+      remove.className = 'context-menu-item';
+      remove.onclick = () => {
+        const index = [...document.querySelectorAll('.tab')].indexOf(tab);
+        document.querySelectorAll('.tab')[index].remove();
+        document.querySelectorAll('.room')[index].remove();
+        setActiveRoom(0);
+        menu.style.display = 'none';
+      };
+
+      menu.append(rename);
+      menu.append(duplicate);
+      menu.append(lockToggle);
+      menu.append(remove);
+    }
+
+    function addRoom() {
+      const tab = document.createElement('div');
+      tab.className = 'tab';
+      tab.textContent = `Комната ${roomCount + 1}`;
+
+      tab.addEventListener('click', () => {
+        setActiveRoom([...document.querySelectorAll('.tab')].indexOf(tab));
+      });
+
+      tab.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        createContextMenu(tab, e);
+      });
+
+      document.getElementById('tabs').appendChild(tab);
+
+      const room = document.createElement('div');
+      room.className = 'room';
+      room.setAttribute('data-room-id', roomCount);
+
+      const door = document.createElement('div');
+      door.classList.add('door');
+      door.setAttribute('data-position', 'left');
+      door.style.left = '0px';
+      door.style.top = '50%';
+      room.appendChild(door);
+
+      makeDoorDraggable(door, room);
+
+      room.addEventListener('click', (e) => {
+        if (e.target === room && !locked) {
+          const rect = room.getBoundingClientRect();
+          const pc = document.createElement('div');
+          pc.classList.add('pc');
+          pc.style.left = (e.clientX - rect.left - 15) + 'px';
+          pc.style.top = (e.clientY - rect.top - 15) + 'px';
+
+          pc.addEventListener('click', ev => {
+            ev.stopPropagation();
+            pc.classList.toggle('selected');
+          });
+
+          pc.addEventListener('contextmenu', ev => {
+            ev.preventDefault();
+            pc.remove();
+          });
+
+          makePCDraggable(pc);
+
+          room.appendChild(pc);
+        }
+      });
+
+      document.getElementById('rooms').appendChild(room);
+      setActiveRoom([...document.querySelectorAll('.tab')].length - 1);
+      roomCount++;
+    }
+
+    function makePCDraggable(pc) {
+      pc.addEventListener('mousedown', function (e) {
+        const offsetX = e.offsetX;
+        const offsetY = e.offsetY;
+        const rect = pc.parentElement.getBoundingClientRect();
+
+        function moveHandler(ev) {
+          const x = ev.clientX - rect.left - offsetX;
+          const y = ev.clientY - rect.top - offsetY;
+          pc.style.left = x + 'px';
+          pc.style.top = y + 'px';
+        }
+
+        function upHandler() {
+          document.removeEventListener('mousemove', moveHandler);
+          document.removeEventListener('mouseup', upHandler);
+        }
+
+        document.addEventListener('mousemove', moveHandler);
+        document.addEventListener('mouseup', upHandler);
+      });
+    }
+
+    function makeDoorDraggable(door, room) {
+      let isDragging = false;
+      let offset = 0;
+
+      door.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        offset = e.offsetY;
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const rect = room.getBoundingClientRect();
+        const roomHeight = room.offsetHeight;
+        let y = e.clientY - rect.top - offset;
+        y = Math.max(0, Math.min(roomHeight - door.offsetHeight, y));
+        door.style.top = y + 'px';
+      });
+
+      document.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+    }
+
+    window.onclick = () => {
+      document.getElementById('contextMenu').style.display = 'none';
+    };
+
+    window.onload = () => {
+      addRoom();
+    };
+  </script>
+</body>
+</html>
